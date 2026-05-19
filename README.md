@@ -4,7 +4,7 @@ Created to visually simulate the movements of the articulatory organs.
 ## Demo
 
 You can try the live demo directly in your browser here:
-[👉 Run the App Live]()
+[👉 Run the App Live](https://otter-ling.github.io/Articulatory-Organs-movement-plz-note-that-this-was-created-by-vibe-coding-/)
 
 ## Technologies Used
 
