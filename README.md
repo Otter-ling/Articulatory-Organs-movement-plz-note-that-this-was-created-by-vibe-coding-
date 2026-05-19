@@ -1,5 +1,5 @@
 # Articulatory-Organs-movement-plz-note-that-this-was-created-by-vibe-coding-
-Created to visually simulate the movements of the articulatory organs. In order to use it, plz download 
+Created to visually simulate the movements of the articulatory organs. In order to use this app, plz download raw file and open it on whatever browser you use.
 
 ## Technologies Used
 
