@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>IPA 調音シミュレーター（シンプル形状版）</title>
+    <title>IPA 調音シミュレーター（震え音・狭め適正化版）</title>
     <style>
         body { 
             text-align: center; 
@@ -12,7 +12,6 @@
             padding: 20px;
         }
         
-        /* ★【ここを修正】h1とpの上下の無駄な余白をギュッと狭く（8ピクセルに）します */
         h1, p {
             margin: 8px 0;
         }
@@ -24,15 +23,19 @@
             border: 2px solid #dfe6e9; 
             border-radius: 12px; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-top: 15px; /* ★図形の上にも少しだけ程よい隙間を作ります */
+            margin-top: 15px;
         }
         .controls { 
             margin-top: 25px; 
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
         }
+        
         button { 
             padding: 12px 24px; 
             font-size: 16px; 
-            margin: 0 8px; 
+            margin: 0 8px 10px 8px;
             cursor: pointer; 
             border: none;
             border-radius: 6px;
@@ -45,7 +48,13 @@
             background-color: #74b9ff;
         }
 
-        /* 欄外の解説（凡例）のためのデザイン */
+        button.reset-btn {
+            background-color: #636e72;
+        }
+        button.reset-btn:hover {
+            background-color: #b2bec3;
+        }
+
         .legend-container {
             margin-top: 30px;
             display: inline-block;
@@ -74,17 +83,27 @@
             display: inline-block;
             margin-right: 12px;
         }
-        .icon-rect-gray { 
-            width: 30px; 
-            height: 12px; 
-            background-color: #b2bec3;
-            clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 70% 40%, 0% 40%);
+        
+        .icon-tooth-white {
+            width: 14px; height: 14px;
+            background-color: #ffffff;
+            border: 2px solid #b2bec3;
+            border-radius: 2px;
         }
+        .icon-uvula-white {
+            width: 14px; height: 18px; 
+            background-color: #ffffff; 
+            border: 2px solid #b2bec3; 
+            border-radius: 50% 50% 10% 10%;
+        }
+        .icon-rect-gray { width: 25px; height: 12px; background-color: #b2bec3; }
+        .icon-velum-purple { width: 25px; height: 8px; background-color: #9b59b6; border-radius: 4px; }
         .icon-square-pink { width: 16px; height: 16px; background-color: #ff7675; }
-        .icon-circle-magenta { width: 18px; height: 18px; background-color: #e84393; border-radius: 50%; }
+        .icon-circle-magenta { width: 12px; height: 12px; background-color: #e84393; border-radius: 50%; }
+        .icon-ellipse-pink { width: 30px; height: 10px; background-color: #ffcccc; border-radius: 50%; border: 1px solid #eeaaaa; }
         .icon-vocal-cords { width: 20px; height: 15px; border-top: 3px dashed #d63031; border-bottom: 3px dashed #d63031; }
 
-        @keyframes vibrate {
+        @keyframes vibrate-subtle {
             0% { transform: translate(0, 0); }
             20% { transform: translate(-1px, 1px); }
             40% { transform: translate(-1px, -1px); }
@@ -92,110 +111,232 @@
             80% { transform: translate(1px, -1px); }
             100% { transform: translate(0, 0); }
         }
-        .vibrating {
-            animation: vibrate 0.05s infinite;
+        
+        @keyframes vibrate-dynamic { 
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0, 0); }
         }
+
+        .vibrating-subtle { animation: vibrate-subtle 0.05s infinite; }
+        .vibrating-dynamic { animation: vibrate-dynamic 0.05s infinite; }
+        
+        rect, circle, ellipse, g {
+            transition: all 1.0s ease-in-out;
+        }
+        
     </style>
 </head>
 <body>
 
     <h1>IPA 調音シミュレーター</h1>
-    <p>ボタンを押すと、それぞれの音を作る位置（調音点）や声門の状態（有声/無声）が変化します</p>
-    <p>舌については、口蓋との距離が最も狭くなる点を円で示しています。</p>
+    <p>震え音 [r], [ʀ] の位置を調整し、受動的なトリルが起こりやすい自然な隙間に最適化しました。</p>
     
     <svg width="400" height="300">
-        <path id="palate" d="M 100,50 L 250,50 L 350,90 L 350,110 L 250,70 L 100,70 Z" fill="#b2bec3" />
-        <text x="200" y="40" fill="#636e72" font-size="12" text-anchor="middle">口蓋（うわあご）</text>
-        <rect id="upper-lip" x="60" y="75" width="25" height="25" fill="#ff7675" style="transition: all 0.3s;" />
-        <rect id="lower-lip" x="60" y="125" width="25" height="25" fill="#ff7675" style="transition: all 0.3s;" />
-        <circle id="tongue" cx="220" cy="180" r="20" fill="#e84393" style="transition: all 0.3s;" />
-        <g id="vocal-cords-group">
-            <line id="vocal-cord-top" x1="320" y1="210" x2="350" y2="210" stroke="#d63031" stroke-width="4" stroke-linecap="round" style="transition: all 0.3s;" />
-            <line id="vocal-cord-bottom" x1="320" y1="230" x2="350" y2="230" stroke="#d63031" stroke-width="4" stroke-linecap="round" style="transition: all 0.3s;" />
+        <path hard-palate d="M 115,50 L 250,50 L 250,70 L 115,70 Z" fill="#b2bec3" />
+        <path pharyngeal-wall d="M 330,105 L 350,105 L 350,260 L 330,260 Z" fill="#b2bec3" />
+        <text x="180" y="43" fill="#636e72" font-size="12" text-anchor="middle">硬口蓋</text>
+        <text x="365" y="180" fill="#636e72" font-size="12" text-anchor="middle" writing-mode="vertical-rl">咽頭壁</text>
+
+        <rect upper-teeth x="90" y="75" width="20" height="20" fill="#ffffff" stroke="#b2bec3" stroke-width="1.5" rx="2" ry="2" />
+
+        <g velum-container style="transform-origin: 250px 60px;">
+            <path velum d="M 250,50 L 335,85 L 330,105 L 250,70 Z" fill="#9b59b6" />
+        </g>
+        <text x="290" y="43" fill="#9b59b6" font-size="12" text-anchor="middle">口蓋帆</text>
+
+        <g id="uvula-container" style="transform-origin: 323px 78px;">
+            <path id="uvula" d="M 314,76 C 314,76 309,95 322,103 C 335,95 330,76 330,76 Z" fill="#ffffff" stroke="#b2bec3" stroke-width="1.5" />
+        </g>
+        <text x="323" y="118" fill="#636e72" font-size="12" text-anchor="middle">口蓋垂</text>
+
+        <rect upper-lip x="60" y="75" width="25" height="25" fill="#ff7675" />
+        <rect lower-lip x="60" y="125" width="25" height="25" fill="#ff7675" />
+
+        <g id="tongue-body-container">
+            <ellipse tongue-body cx="230" cy="180" rx="80" ry="18" fill="#ffcccc" stroke="#eeaaaa" stroke-width="1" />
+        </g>
+
+        <g id="tongue-point-container">
+            <circle tongue-point cx="230" cy="180" r="12" fill="#e84393" />
+        </g>
+
+        <g id="vocal-cords-container">
+            <line vocal-cord-top x1="320" y1="210" x2="350" y2="210" stroke="#d63031" stroke-width="4" stroke-linecap="round" />
+            <line vocal-cord-bottom x1="320" y1="230" x2="350" y2="230" stroke="#d63031" stroke-width="4" stroke-linecap="round" />
         </g>
         <text x="335" y="255" fill="#636e72" font-size="12" text-anchor="middle">声門</text>
     </svg>
 
     <div class="controls">
-        <button onclick="simulate('t')">[t] 無声歯茎音（無声・接触）</button>
-        <button onclick="simulate('k')">[k] 無声軟口蓋音（無声・接触）</button>
-        <button onclick="simulate('gh')">[ɣ] 有声軟口蓋音（有声・狭め）</button>
-        <button onclick="simulate('p')">[p] 有声両唇音（有声・唇閉じる）</button>
-        <button onclick="simulate('reset')">リセット（基本位置）</button>
+        <button onclick="simulate('t')">[t] 無声歯茎音</button>
+        <button onclick="simulate('r_trill')">[r] 有声歯茎震え音</button>
+        <button onclick="simulate('k')">[k] 無声軟口蓋音</button>
+        <button onclick="simulate('gh')">[ɣ] 有声軟口蓋音</button>
+        <button onclick="simulate('p_voiced')">[b] 有声両唇音</button>
+        <button onclick="simulate('m')">[m] 有声両唇鼻音</button>
+        <button onclick="simulate('ng')">[ŋ] 有声軟口蓋鼻音</button>
+        <button onclick="simulate('theta')">[θ] 無声歯摩擦音</button>
+        <button onclick="simulate('eth')">[ð] 有声歯摩擦音</button>
+        <button onclick="simulate('q')">[q] 無声口蓋垂破裂音</button>
+        <button onclick="simulate('R_trill')">[ʀ] 有声口蓋垂震え音</button>
+        
+        <button class="reset-btn" onclick="simulate('reset')">強制リセット</button>
     </div>
 
     <div class="legend-container">
         <div class="legend-title">図記号の説明</div>
         <div class="legend-item">
+            <span class="icon icon-tooth-white"></span>
+            <span><strong>白い正方形：</strong> 上歯（固定パーツ）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-uvula-white"></span>
+            <span><strong>白い涙型（口蓋垂）：</strong> 震え音 [ʀ] の時にここが独立して激しく振動します。</span>
+        </div>
+        <div class="legend-item">
             <span class="icon icon-rect-gray"></span>
-            <span><strong>グレーの形状：</strong> 口蓋（右下がりが軟口蓋・口蓋垂側）を表す固定パーツ</span>
+            <span><strong>グレーの形状：</strong> 硬口蓋と咽頭壁（不動部分）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-velum-purple"></span>
+            <span><strong>紫の形状（口蓋帆）：</strong> 鼻腔への弁</span>
         </div>
         <div class="legend-item">
             <span class="icon icon-square-pink"></span>
-            <span><strong>2つの正方形（ピンク）：</strong> 上唇と下唇を表す可動パーツ</span>
+            <span><strong>2つの正方形（ピンク）：</strong> 上唇と下唇</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-ellipse-pink"></span>
+            <span><strong>薄いピンクの楕円：</strong> 舌全体（調音点に合わせて斜めに傾きます）</span>
         </div>
         <div class="legend-item">
             <span class="icon icon-circle-magenta"></span>
-            <span><strong>円（マゼンタ）：</strong> 舌（音を作る際の、最も狭まる点）を表す可動パーツ</span>
+            <span><strong>円（マゼンタ）：</strong> 舌の最狭点</span>
         </div>
         <div class="legend-item">
             <span class="icon icon-vocal-cords"></span>
-            <span><strong>2本の赤線（レッド）：</strong> 声帯（有声音のときはピタッと閉じてブルブル震える）</span>
+            <span><strong>2本の赤線：</strong> 声帯（有声音や震え音のときは微細に振動）</span>
         </div>
     </div>
 
     <script>
+        let activeTimeouts = [];
+
         const positions = {
             't': {
-                tongueX: 130, tongueY: 85,
-                upperLipY: 75, lowerLipY: 125,
-                cordTopY: 210, cordBottomY: 230, vibrate: false
+                pointX: 135, pointY: 82, bodyCx: 195, bodyCy: 98, angle: 12, upperLipY: 75, lowerLipY: 125, cordTopY: 210, cordBottomY: 230, vibrate: false, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            // ★【修正】[r] 有声歯茎震え音：破裂音[t](pointY: 82)のように押し潰さず、
+            // 隙間に余裕を持たせるため pointY を 90（bodyCy も 106）に引き下げ、適正なすきまを確保。
+            'r_trill': {
+                pointX: 135, pointY: 90, bodyCx: 195, bodyCy: 106, angle: 12, upperLipY: 75, lowerLipY: 125, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: true
             },
             'k': {
-                tongueX: 300, tongueY: 100,
-                upperLipY: 75, lowerLipY: 125,
-                cordTopY: 210, cordBottomY: 230, vibrate: false
+                pointX: 295, pointY: 102, bodyCx: 240, bodyCy: 122, angle: -15, upperLipY: 75, lowerLipY: 125, cordTopY: 210, cordBottomY: 230, vibrate: false, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
             },
             'gh': {
-                tongueX: 300, tongueY: 125,
-                upperLipY: 75, lowerLipY: 125,
-                cordTopY: 220, cordBottomY: 220, vibrate: true
+                pointX: 295, pointY: 120, bodyCx: 240, bodyCy: 140, angle: -15, upperLipY: 75, lowerLipY: 125, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
             },
-            'p': {
-                tongueX: 220, tongueY: 180,
-                upperLipY: 90, lowerLipY: 110,
-                cordTopY: 220, cordBottomY: 220, vibrate: true
+            'p_voiced': {
+                pointX: 230, pointY: 180, bodyCx: 230, bodyCy: 180, angle: 0, upperLipY: 90, lowerLipY: 110, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            'm': {
+                pointX: 230, pointY: 180, bodyCx: 230, bodyCy: 180, angle: 0, upperLipY: 90, lowerLipY: 110, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 23, uvulaAngle: 23, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            'ng': {
+                pointX: 280, pointY: 122, bodyCx: 230, bodyCy: 138, angle: -15, upperLipY: 75, lowerLipY: 125, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 25, uvulaAngle: 25, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            'theta': {
+                pointX: 110, pointY: 107, bodyCx: 170, bodyCy: 123, angle: 15, upperLipY: 75, lowerLipY: 125, cordTopY: 210, cordBottomY: 230, vibrate: false, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            'eth': {
+                pointX: 110, pointY: 107, bodyCx: 170, bodyCy: 123, angle: 15, upperLipY: 75, lowerLipY: 125, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            'q': {
+                pointX: 312, pointY: 110, bodyCx: 250, bodyCy: 126, angle: -15, upperLipY: 75, lowerLipY: 125, cordTopY: 210, cordBottomY: 230, vibrate: false, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: false, tonguePointVibrate: false
+            },
+            // ★【修正】[ʀ] 有声口蓋垂震え音：破裂音[q](pointY: 110)のように完全に密閉せず、
+            // 気流が通過してトリルが起こりやすいよう、pointY を 128（bodyCy も 144）まで下げてルーズなアプローチに調整。
+            'R_trill': {
+                pointX: 312, pointY: 128, bodyCx: 250, bodyCy: 144, angle: -15, upperLipY: 75, lowerLipY: 125, cordTopY: 220, cordBottomY: 220, vibrate: true, velumAngle: 0, uvulaAngle: 0, uvulaVibrate: true, tonguePointVibrate: false
             },
             'reset': {
-                tongueX: 220, tongueY: 180,
-                upperLipY: 75, lowerLipY: 125,
-                cordTopY: 210, cordBottomY: 230, vibrate: false
+                pointX: 230, pointY: 180, bodyCx: 230, bodyCy: 180, angle: 0, upperLipY: 75, lowerLipY: 125, cordTopY: 210, cordBottomY: 230, vibrate: false, velumAngle: 23, uvulaAngle: 23, uvulaVibrate: false, tonguePointVibrate: false
             }
         };
 
-        function simulate(sound) {
-            const tongue = document.getElementById('tongue');
-            const upperLip = document.getElementById('upper-lip');
-            const lowerLip = document.getElementById('lower-lip');
-            const cordTop = document.getElementById('vocal-cord-top');
-            const cordBottom = document.getElementById('vocal-cord-bottom');
-            const cordGroup = document.getElementById('vocal-cords-group');
-            
-            const data = positions[sound];
+        function clearTimeline() {
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+        }
 
-            tongue.setAttribute('cx', data.tongueX);
-            tongue.setAttribute('cy', data.tongueY);
+        function simulate(sound) {
+            clearTimeline();
+
+            // 1. 【0秒時点】移動を開始（この時点ではまだ震えません）
+            applyPosition(sound, false);
+
+            if (sound === 'reset') return;
+
+            // 2. 【1.5秒時点】到着の0.5秒後から、適度に確保されたすきまでブルブルとトリルをスタート
+            const startVibrationTimeout = setTimeout(() => {
+                applyPosition(sound, true);
+            }, 1500);
+
+            // 3. 【5秒時点】調音終了、リセット位置へ帰還
+            const stopAndResetTimeout = setTimeout(() => {
+                applyPosition('reset', false);
+            }, 5000);
+
+            activeTimeouts.push(startVibrationTimeout, stopAndResetTimeout);
+        }
+
+        function applyPosition(soundKey, enableVibration) {
+            const velumContainer = document.querySelector('[velum-container]');
+            const upperLip = document.querySelector('[upper-lip]');
+            const lowerLip = document.querySelector('[lower-lip]');
+            const tongueBodyContainer = document.getElementById('tongue-body-container');
+            const tongueBody = document.querySelector('[tongue-body]');
+            const tonguePointContainer = document.getElementById('tongue-point-container');
+            const tonguePoint = document.querySelector('[tongue-point]');
+            const vocalCordsContainer = document.getElementById('vocal-cords-container');
+            const vocalCordTop = document.querySelector('[vocal-cord-top]');
+            const vocalCordBottom = document.querySelector('[vocal-cord-bottom]');
+            const uvulaContainer = document.getElementById('uvula-container');
+
+            const data = positions[soundKey];
+
+            tonguePoint.setAttribute('cx', data.pointX);
+            tonguePoint.setAttribute('cy', data.pointY);
+            tongueBody.setAttribute('cx', data.bodyCx);
+            tongueBody.setAttribute('cy', data.bodyCy);
+            
+            tongueBodyContainer.style.transform = `rotate(${data.angle}deg)`;
+            tongueBodyContainer.style.transformOrigin = `${data.bodyCx}px ${data.bodyCy}px`;
+
             upperLip.setAttribute('y', data.upperLipY);
             lowerLip.setAttribute('y', data.lowerLipY);
-            cordTop.setAttribute('y1', data.cordTopY);
-            cordTop.setAttribute('y2', data.cordTopY);
-            cordBottom.setAttribute('y1', data.cordBottomY);
-            cordBottom.setAttribute('y2', data.cordBottomY);
 
-            if (data.vibrate) {
-                cordGroup.classList.add('vibrating');
+            vocalCordTop.setAttribute('y1', data.cordTopY);
+            vocalCordTop.setAttribute('y2', data.cordTopY);
+            vocalCordBottom.setAttribute('y1', data.cordBottomY);
+            vocalCordBottom.setAttribute('y2', data.cordBottomY);
+
+            velumContainer.style.transform = `rotate(${data.velumAngle}deg)`;
+            uvulaContainer.style.transform = `rotate(${data.uvulaAngle}deg)`;
+
+            if (enableVibration) {
+                if (data.vibrate) vocalCordsContainer.classList.add('vibrating-subtle');
+                if (data.uvulaVibrate) uvulaContainer.classList.add('vibrating-dynamic');
+                if (data.tonguePointVibrate) tonguePointContainer.classList.add('vibrating-dynamic');
             } else {
-                cordGroup.classList.remove('vibrating');
+                vocalCordsContainer.classList.remove('vibrating-subtle');
+                uvulaContainer.classList.remove('vibrating-dynamic');
+                tonguePointContainer.classList.remove('vibrating-dynamic');
             }
         }
     </script>
