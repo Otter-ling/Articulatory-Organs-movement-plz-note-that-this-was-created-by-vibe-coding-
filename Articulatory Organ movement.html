@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>IPA 調音シミュレーター（シンプル形状版）</title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: sans-serif; 
+            background: #f4f6f9; 
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        svg { 
+            background: white; 
+            border: 2px solid #dfe6e9; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .controls { 
+            margin-top: 25px; 
+        }
+        button { 
+            padding: 12px 24px; 
+            font-size: 16px; 
+            margin: 0 8px; 
+            cursor: pointer; 
+            border: none;
+            border-radius: 6px;
+            background-color: #0984e3;
+            color: white;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #74b9ff;
+        }
+
+        /* 欄外の解説（凡例）のためのデザイン */
+        .legend-container {
+            margin-top: 30px;
+            display: inline-block;
+            text-align: left;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #dfe6e9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2d3436;
+            border-bottom: 2px solid #f4f6f9;
+            padding-bottom: 5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 14px;
+            color: #636e72;
+        }
+        .icon {
+            display: inline-block;
+            margin-right: 12px;
+        }
+        .icon-rect-gray { 
+            width: 30px; 
+            height: 12px; 
+            background-color: #b2bec3;
+            clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 70% 40%, 0% 40%);
+        }
+        .icon-square-pink { width: 16px; height: 16px; background-color: #ff7675; }
+        .icon-circle-magenta { width: 18px; height: 18px; background-color: #e84393; border-radius: 50%; }
+        /* 凡例用の声帯アイコン（震える波線っぽく） */
+        .icon-vocal-cords { width: 20px; height: 15px; border-top: 3px dashed #d63031; border-bottom: 3px dashed #d63031; }
+
+        /* ★声帯が有声音でブルブル震えるアニメーション（CSS） */
+        @keyframes vibrate {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-1px, 1px); }
+            40% { transform: translate(-1px, -1px); }
+            60% { transform: translate(1px, 1px); }
+            80% { transform: translate(1px, -1px); }
+            100% { transform: translate(0, 0); }
+        }
+        .vibrating {
+            animation: vibrate 0.05s infinite; /* 0.05秒周期で高速ループ */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>IPA 調音シミュレーター</h1>
+    <p>ボタンを押すと、それぞれの音を作る位置（調音点）や声門の状態（有声/無声）が変化します</p>
+    
+    <!-- 画面上の配置エリア（横400ピクセル、縦300ピクセル） -->
+    <svg width="400" height="300">
+        
+        <!-- 【固定】口蓋（こうがい）：右端が斜めに下がる形 -->
+        <path id="palate" d="M 100,50 L 250,50 L 350,90 L 350,110 L 250,70 L 100,70 Z" fill="#b2bec3" />
+        <text x="200" y="40" fill="#636e72" font-size="12" text-anchor="middle">口蓋（うわあご）</text>
+
+        <!-- 【可動】上唇：正方形 -->
+        <rect id="upper-lip" x="60" y="75" width="25" height="25" fill="#ff7675" style="transition: all 0.3s;" />
+        
+        <!-- 【可動】下唇：正方形 -->
+        <rect id="lower-lip" x="60" y="125" width="25" height="25" fill="#ff7675" style="transition: all 0.3s;" />
+
+        <!-- 【可動】舌（の狭めを作る点）：円 -->
+        <circle id="tongue" cx="220" cy="180" r="20" fill="#e84393" style="transition: all 0.3s;" />
+
+        <!-- ★【新設・可動】声門（声帯）：2本の赤い線。グループ（gタグ）にまとめて震えさせます -->
+        <g id="vocal-cords-group">
+            <!-- 上側の声帯（初期位置：無声音の開いた状態） -->
+            <line id="vocal-cord-top" x1="320" y1="210" x2="350" y2="210" stroke="#d63031" stroke-width="4" stroke-linecap="round" style="transition: all 0.3s;" />
+            <!-- 下側の声帯（初期位置：無声音の開いた状態） -->
+            <line id="vocal-cord-bottom" x1="320" y1="230" x2="350" y2="230" stroke="#d63031" stroke-width="4" stroke-linecap="round" style="transition: all 0.3s;" />
+        </g>
+        <text x="335" y="255" fill="#636e72" font-size="12" text-anchor="middle">声門</text>
+
+    </svg>
+
+    <!-- 操作ボタン -->
+    <div class="controls">
+        <button onclick="simulate('t')">[t] 無声歯茎音（無声・接触）</button>
+        <button onclick="simulate('k')">[k] 無声軟口蓋音（無声・接触）</button>
+        <button onclick="simulate('gh')">[ɣ] 有声軟口蓋音（有声・狭め）</button>
+        <button onclick="simulate('p')">[p] 有声両唇音（有声・唇閉じる）</button>
+        <button onclick="simulate('reset')">リセット（基本位置）</button>
+    </div>
+
+    <!-- 欄外の図形解説エリア（凡例） -->
+    <div class="legend-container">
+        <div class="legend-title">図記号の説明</div>
+        <div class="legend-item">
+            <span class="icon icon-rect-gray"></span>
+            <span><strong>グレーの形状：</strong> 口蓋（右下がりが軟口蓋・口蓋垂側）を表す固定パーツ</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-square-pink"></span>
+            <span><strong>2つの正方形（ピンク）：</strong> 上唇と下唇を表す可動パーツ</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-circle-magenta"></span>
+            <span><strong>円（マゼンタ）：</strong> 舌（音を作る際の、最も狭まる点）を表す可動パーツ</span>
+        </div>
+        <!-- 欄外の解説にも声帯を追加 -->
+        <div class="legend-item">
+            <span class="icon icon-vocal-cords"></span>
+            <span><strong>2本の赤線（レッド）：</strong> 声帯（有声音のときはピタッと閉じてブルブル震える）</span>
+        </div>
+    </div>
+
+    <script>
+        // それぞれの音を出すときの、各パーツの座標データ
+        // ★vocalCordTopY と vocalCordBottomY、そして vibrate（震えるか）のデータを追加
+        const positions = {
+            't': {
+                tongueX: 130, tongueY: 85,
+                upperLipY: 75, lowerLipY: 125,
+                cordTopY: 210, cordBottomY: 230, vibrate: false // 無声音：開く・震えない
+            },
+            'k': {
+                tongueX: 300, tongueY: 100,
+                upperLipY: 75, lowerLipY: 125,
+                cordTopY: 210, cordBottomY: 230, vibrate: false // 無声音：開く・震えない
+            },
+            'gh': {
+                tongueX: 300, tongueY: 125,
+                upperLipY: 75, lowerLipY: 125,
+                cordTopY: 220, cordBottomY: 220, vibrate: true  // 有声音：閉じる・震える！
+            },
+            'p': {
+                tongueX: 220, tongueY: 180,
+                upperLipY: 90, lowerLipY: 110,
+                cordTopY: 210, cordBottomY: 230, vibrate: false  // 無声音：閉じる・震えない！
+            },
+            'reset': {
+                tongueX: 220, tongueY: 180,
+                upperLipY: 75, lowerLipY: 125,
+                cordTopY: 210, cordBottomY: 230, vibrate: false // 初期位置は無声状態
+            }
+        };
+
+        // ボタンが押されたときに動く命令
+        function simulate(sound) {
+            const tongue = document.getElementById('tongue');
+            const upperLip = document.getElementById('upper-lip');
+            const lowerLip = document.getElementById('lower-lip');
+            const cordTop = document.getElementById('vocal-cord-top');
+            const cordBottom = document.getElementById('vocal-cord-bottom');
+            const cordGroup = document.getElementById('vocal-cords-group');
+            
+            const data = positions[sound];
+
+            // 1. 舌（円）の位置を変更
+            tongue.setAttribute('cx', data.tongueX);
+            tongue.setAttribute('cy', data.tongueY);
+
+            // 2. 上唇・下唇（正方形）の位置を変更
+            upperLip.setAttribute('y', data.upperLipY);
+            lowerLip.setAttribute('y', data.lowerLipY);
+
+            // 3. ★【新機能】声帯（線）の開閉を変更
+            // 線の始まり(y1)と終わり(y2)を同時に同じ高さに動かします
+            cordTop.setAttribute('y1', data.cordTopY);
+            cordTop.setAttribute('y2', data.cordTopY);
+            cordBottom.setAttribute('y1', data.cordBottomY);
+            cordBottom.setAttribute('y2', data.cordBottomY);
+
+            // 4. ★【新機能】声帯を震わせるかどうかの切り替え
+            if (data.vibrate) {
+                cordGroup.classList.add('vibrating'); // CSSのアニメーションをONにする
+            } else {
+                cordGroup.classList.remove('vibrating'); // CSSのアニメーションをOFFにする
+            }
+        }
+    </script>
+</body>
+</html>
