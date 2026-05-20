@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>IPA 調音シミュレーター（破裂開放バースト対応版）</title>
+    <title>IPA 調音シミュレーター（気流ルート口蓋側修正版）</title>
     <style>
         body { 
             text-align: center; 
@@ -146,7 +146,7 @@
 <body>
 
     <h1>IPA 調音シミュレーター</h1>
-    <p>閉鎖音（[t], [k], [q], [b]）では、5秒目に閉鎖が**「解放（バースト）」された瞬間、口の外へ実線の矢印**が飛び出します。</p>
+    <p>気流（青い矢印）の軌道を修正し、常に舌の表面（上面）よりも上側（口蓋側）の隙間を通るように適正化しました。</p>
     
     <svg width="400" height="300">
         <defs>
@@ -212,9 +212,12 @@
 
     <div class="legend-container">
         <div class="legend-title">図記号の説明</div>
-        <div class="legend-item"><span class="icon icon-airflow-arrow"></span><span><strong>青い矢印（気流）：</strong> 呼気の流れ。閉鎖音では、開放の瞬間に口外へ実線矢印が出ます。</span></div>
+        <div class="legend-item">
+            <span class="icon icon-airflow-arrow"></span>
+            <span><strong>青い矢印（気流）：</strong> 呼気の流れ。常に舌の上面（口蓋側）の隙間をトレースして流れます。</span>
+        </div>
         <div class="legend-item"><span class="icon icon-tooth-white"></span><span><strong>白い正方形：</strong> 上歯（固定パーツ）</span></div>
-        <div class="legend-item"><span class="icon icon-uvula-white"></span><span><strong>白い涙型（口蓋垂）：</strong> 震え音 [ʀ] の時にここが独立して激しく振動します。</span></div>
+        <div class="legend-item"><span class="icon icon-uvula-white"></span><span><strong>白い涙型（口蓋垂）：</strong> 震え音 [ʀ] の時にここが激しく振動します。</span></div>
         <div class="legend-item"><span class="icon icon-rect-gray"></span><span><strong>グレーの形状：</strong> 硬口蓋と咽頭壁</span></div>
         <div class="legend-item"><span class="icon icon-velum-purple"></span><span><strong>紫の形状（口蓋帆）：</strong> 鼻腔への弁</span></div>
         <div class="legend-item"><span class="icon icon-square-pink"></span><span><strong>2つの正方形（ピンク）：</strong> 上唇と下唇</span></div>
@@ -249,24 +252,23 @@
         function simulate(sound) {
             clearTimeline();
 
-            // 1. 【0秒】器官の移動を開始（移動中は気流描画なし）
+            // 1. 【0秒】器官の移動を開始
             applyPosition(sound, false, false, false);
 
             if (sound === 'reset') return;
 
-            // 2. 【1.5秒】到着の0.5秒後。持続フェーズのアニメーション（摩擦・震え・閉鎖）を開始
+            // 2. 【1.5秒】到着の0.5秒後。振動と気流アニメを同時にON
             const startVibrationTimeout = setTimeout(() => {
-                applyPosition(sound, true, true, false); // まだバースト矢印は出さない
+                applyPosition(sound, true, true, false);
             }, 1500);
 
-            // 3. ★【新仕様】【5秒時点】調音終了・開放の瞬間！
-            // 各器官をニュートラルに戻し、閉鎖音なら「実線バースト矢印」をONにする
+            // 3. 【5秒】調音終了・開放の瞬間。帰還させ、閉鎖音なら「実線バースト矢印」をON
             const stopAndResetTimeout = setTimeout(() => {
                 const isStopSound = (positions[sound].airRoute === 'stop');
                 applyPosition('reset', false, false, isStopSound ? sound : false);
             }, 5000);
 
-            // 4. 【5.8秒時点】バーストの矢印をニュートラル帰還完了（6秒）の手前でパッと消し去る
+            // 4. 【5.8秒】バースト矢印を消去
             const clearBurstTimeout = setTimeout(() => {
                 applyPosition('reset', false, false, false);
             }, 5800);
@@ -290,7 +292,7 @@
 
             const data = positions[soundKey];
 
-            // 座標更新
+            // 座標情報の更新
             tonguePoint.setAttribute('cx', data.pointX);
             tonguePoint.setAttribute('cy', data.pointY);
             tongueBody.setAttribute('cx', data.bodyCx);
@@ -302,7 +304,7 @@
             velumContainer.style.transform = `rotate(${data.velumAngle}deg)`;
             uvulaContainer.style.transform = `rotate(${data.uvulaAngle}deg)`;
 
-            // 振動の更新
+            // 振動の制御
             if (enableVibration) {
                 if (data.vibrate) vocalCordsContainer.classList.add('vibrating-subtle');
                 if (data.uvulaVibrate) uvulaContainer.classList.add('vibrating-dynamic');
@@ -313,58 +315,61 @@
                 tonguePointContainer.classList.remove('vibrating-dynamic');
             }
 
-            // --- 通常気流（点線）の動的制御 ---
+            // --- ★【修正】通常気流（点線）を舌の上面（口蓋側）に沿わせるベジエ制御 ---
             airLine.style.opacity = "0";
             airLine.style.animation = "none";
             airLine.removeAttribute('marker-end');
 
             if (enableAirflow && soundKey !== 'reset') {
                 let pathD = "";
-                const startX = 335, startY = 220;
+                const startX = 335, startY = 220; // 声門位置
+                
+                // ★ 舌の最狭点（マゼンタの円：半径12）のフチよりも、さらに上側の口蓋空間（y - 16〜22）を完全に通過させる
                 const pX = data.pointX;
-                const pY = data.pointY - 12;
+                const pY = data.pointY - 18; 
 
                 if (data.airRoute === 'oral') {
-                    pathD = `M ${startX},${startY} C 335,200 300,${pY + 30} ${pX},${pY} C ${pX - 40},${pY - 15} 110,115 60,115`;
+                    // 声門 ➔ 咽頭腔を上がり、舌全体のピンクの楕円を上から回り込むように制御点（Cの第1制御点）を設定 ➔ 狭め(pX, pY) ➔ 唇の上側
+                    pathD = `M ${startX},${startY} C 330,170 300,${pY + 15} ${pX},${pY} C ${pX - 40},${pY - 5} 100,105 60,105`;
                     airLine.setAttribute('marker-end', 'url(#arrowhead)');
                     airLine.style.opacity = "0.85";
                     airLine.style.animation = "flow 0.6s linear infinite";
                 } 
                 else if (data.airRoute === 'nasal') {
-                    pathD = `M ${startX},${startY} C 335,200 300,160 250,100 C 220,40 120,40 50,40`;
+                    // 鼻腔ルート（舌の上には行かず、下がった口蓋帆の裏側を通る）
+                    pathD = `M ${startX},${startY} C 335,180 290,130 240,95 C 210,40 120,40 50,40`;
                     airLine.setAttribute('marker-end', 'url(#arrowhead)');
                     airLine.style.opacity = "0.85";
                     airLine.style.animation = "flow 0.6s linear infinite";
                 } 
                 else if (data.airRoute === 'stop') {
-                    // 閉鎖持続中：調音点の手前で点線がピタッとせき止められる
-                    pathD = `M ${startX},${startY} C 335,200 300,${pY + 40} ${pX},${pY + 5}`;
+                    // 閉鎖持続中：舌の上面と口蓋が接する直前（pX, pY + 20）で衝突して溜まる
+                    pathD = `M ${startX},${startY} C 330,170 300,${pY + 35} ${pX},${pY + 15}`;
                     airLine.style.opacity = "0.4";
                 }
                 airLine.setAttribute('d', pathD);
             }
 
-            // --- ★【新設】破裂開放バースト実線矢印の制御 ---
+            // --- ★【修正】破裂開放バースト（実線矢印）も口蓋側（上側）のルートを通過させる ---
             airBurst.style.opacity = "0";
             if (burstSoundOrigin) {
-                // どの閉鎖音が破裂したかに応じて、各調音点から口の外（左端）へ抜ける「実線のパス」を生成
                 let burstD = "";
                 const origX = positions[burstSoundOrigin].pointX;
-                const origY = positions[burstSoundOrigin].pointY - 12;
+                const origY = positions[burstSoundOrigin].pointY - 18; // 上側のフチから射出
 
                 if (burstSoundOrigin === 'p_voiced' || burstSoundOrigin === 'm') {
-                    // 両唇音の開放：唇の間(65, 110) から口の外(15, 110)へ
-                    burstD = "M 75,115 L 15,115";
+                    // 唇の破裂：唇の隙間のやや上側から前方へ直線射出
+                    burstD = "M 75,105 L 15,105";
                 } else if (burstSoundOrigin === 't') {
-                    // 歯茎音の開放：歯茎(135) から口の外(15, 115)へ
-                    burstD = `M ${origX},${origY} C 110,115 70,115 15,115`;
+                    // 歯茎の破裂：歯茎(135, 64)から上歯の裏をかすめて外へ
+                    burstD = `M ${origX},${origY} C 110,95 60,105 15,105`;
                 } else {
-                    // 軟口蓋(k)・口蓋垂(q)の開放：のど奥から一気に口の外(15, 115)へ
-                    burstD = `M ${origX},${origY} C ${origX - 50},130 100,115 15,115`;
+                    // 軟口蓋・口蓋垂の破裂：のど奥の上側隙間から、舌を上から飛び越えて外へ
+                    burstD = `M ${origX},${origY} C ${origX - 60},90 100,105 15,105`;
                 }
 
                 airBurst.setAttribute('d', burstD);
-                airBurst.style.opacity = "0.9"; // 実線矢印をパッと表示！
+                airBurst.style.opacity = "0.9";
             }
         }
     </script>
