@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>IPA 母音調音シミュレーター</title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: sans-serif; 
+            background: #f4f6f9; 
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1, p {
+            margin: 8px 0;
+        }
+        
+        h1 { color: #333; }
+        
+        svg { 
+            background: white; 
+            border: 2px solid #dfe6e9; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-top: 15px;
+        }
+        .controls { 
+            margin-top: 25px; 
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        button { 
+            padding: 12px 24px; 
+            font-size: 16px; 
+            margin: 0 8px 10px 8px;
+            cursor: pointer; 
+            border: none;
+            border-radius: 6px;
+            background-color: #0984e3;
+            color: white;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #74b9ff;
+        }
+
+        button.reset-btn {
+            background-color: #636e72;
+        }
+        button.reset-btn:hover {
+            background-color: #b2bec3;
+        }
+
+        .legend-container {
+            margin-top: 30px;
+            display: inline-block;
+            text-align: left;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #dfe6e9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2d3436;
+            border-bottom: 2px solid #f4f6f9;
+            padding-bottom: 5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 14px;
+            color: #636e72;
+        }
+        .icon {
+            display: inline-block;
+            margin-right: 12px;
+        }
+        
+        .icon-rect-gray { width: 25px; height: 12px; background-color: #b2bec3; }
+        .icon-square-pink { width: 16px; height: 16px; background-color: #ff7675; }
+        .icon-circle-magenta { width: 12px; height: 12px; background-color: #e84393; border-radius: 50%; }
+        .icon-ellipse-pink { width: 30px; height: 10px; background-color: #ffcccc; border-radius: 50%; border: 1px solid #eeaaaa; }
+        .icon-vocal-cords { width: 20px; height: 15px; border-top: 3px dashed #d63031; border-bottom: 3px dashed #d63031; }
+
+        /* 高速振動用のアニメーションCSS（声帯用） */
+        @keyframes vibrate-subtle {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-1px, 1px); }
+            40% { transform: translate(-1px, -1px); }
+            60% { transform: translate(1px, 1px); }
+            80% { transform: translate(1px, -1px); }
+            100% { transform: translate(0, 0); }
+        }
+        .vibrating-subtle { animation: vibrate-subtle 0.05s infinite; }
+        
+        /* 1秒かけて滑らかに器官を移動させる */
+        rect, circle, ellipse, g {
+            transition: all 1.0s ease-in-out;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <h1>IPA 母音調音シミュレーター</h1>
+    <p>ボタンを押すと、**舌の最高点の位置（高低・前後）**と、**唇の丸み（円唇・非円唇）**が変化します。</p>
+    <p>【1秒かけて移動 ➔ 1.5秒時点で声帯振動開始 ➔ 5秒時点で自動リセット】の6秒タイムラインです。</p>
+    
+    <svg width="400" height="300">
+        <path hard-palate d="M 80,60 L 230,60 L 330,100 L 330,120 L 230,80 L 80,80 Z" fill="#b2bec3" />
+        <text x="180" y="45" fill="#636e72" font-size="12" text-anchor="middle">上あご（顎骨ライン）</text>
+
+        <rect id="upper-lip" x="50" y="85" width="25" height="20" fill="#ff7675" />
+        <rect id="lower-lip" x="50" y="135" width="25" height="20" fill="#ff7675" />
+
+        <g id="tongue-body-container">
+            <ellipse tongue-body cx="220" cy="190" rx="85" ry="25" fill="#ffcccc" stroke="#eeaaaa" stroke-width="1" />
+        </g>
+
+        <g id="tongue-point-container">
+            <circle tongue-point cx="220" cy="190" r="12" fill="#e84393" />
+        </g>
+
+        <g id="vocal-cords-container">
+            <line vocal-cord-top x1="320" y1="210" x2="350" y2="210" stroke="#d63031" stroke-width="4" stroke-linecap="round" />
+            <line vocal-cord-bottom x1="320" y1="230" x2="350" y2="230" stroke="#d63031" stroke-width="4" stroke-linecap="round" />
+        </g>
+        <text x="335" y="255" fill="#636e72" font-size="12" text-anchor="middle">声門</text>
+    </svg>
+
+    <div class="controls">
+        <button onclick="simulate('i')">[i] 狭前舌非円唇母音 (い)</button>
+        <button onclick="simulate('e')">[e] 半狭前舌非円唇母音 (え)</button>
+        <button onclick="simulate('a')">[a] 広前舌非円唇母音 (あ)</button>
+        <button onclick="simulate('schwa')">[ə] 中央半広母音（シュワ）</button>
+        <button onclick="simulate('open_o')">[ɔ] 半広後舌円唇母音</button>
+        <button onclick="simulate('o')">[o] 半狭後舌円唇母音 (お)</button>
+        <button onclick="simulate('u')">[u] 狭後舌円唇母音 (う)</button>
+        
+        <button class="reset-btn" onclick="simulate('reset')">強制リセット</button>
+    </div>
+
+    <div class="legend-container">
+        <div class="legend-title">図記号の説明</div>
+        <div class="legend-item">
+            <span class="icon icon-rect-gray"></span>
+            <span><strong>グレーの形状：</strong> 上あごの基準ライン（不動部分）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-square-pink"></span>
+            <span><strong>2つの正方形（ピンク）：</strong> 上唇と下唇（[u][o]など円唇の時は前へ突き出て閉じます）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-ellipse-pink"></span>
+            <span><strong>薄いピンクの楕円：</strong> 舌全体（母音の音色変化に応じてダイナミックに形と位置を変えます）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-circle-magenta"></span>
+            <span><strong>円（マゼンタ）：</strong> 舌の最高点（母音四辺形上のプロット。常に楕円の頂点と連動します）</span>
+        </div>
+        <div class="legend-item">
+            <span class="icon icon-vocal-cords"></span>
+            <span><strong>2本の赤線：</strong> 声帯（すべての母音で、開始1.5秒後から自動で微細に振動します）</span>
+        </div>
+    </div>
+
+    <script>
+        let activeTimeouts = [];
+
+        // ★ 母音空間（高低・前後）と唇の連動データ
+        const positions = {
+            // [i]: 高母音・前舌。舌の最高点（円）が左上の極限まで引き上がり、前上がりに強く傾く。唇は横に引く（元の位置）。
+            'i': {
+                pointX: 130, pointY: 100, bodyCx: 190, bodyCy: 116, angle: 22,
+                lipX: 50, upperLipY: 88, lowerLipY: 132
+            },
+            // [e]: 中高母音・前舌。[i]と[a]の中間位置。少し下に下がる。
+            'e': {
+                pointX: 145, pointY: 130, bodyCx: 205, bodyCy: 146, angle: 15,
+                lipX: 50, upperLipY: 85, lowerLipY: 135
+            },
+            // [a]: 低母音・前舌（〜中舌）。舌全体が底のほうに沈み込み、あごが開く。
+            'a': {
+                pointX: 160, pointY: 185, bodyCx: 210, bodyCy: 195, angle: 5,
+                lipX: 50, upperLipY: 78, lowerLipY: 142
+            },
+            // [schwa] (ə): 中央母音。すべてが完全にリラックスしたニュートラルな中段・中央位置。
+            'schwa': {
+                pointX: 210, pointY: 150, bodyCx: 210, bodyCy: 155, angle: 0,
+                lipX: 50, upperLipY: 85, lowerLipY: 135
+            },
+            // [ɔ]: 中低母音・後舌。舌の盛り上がりが右下（奥）へ。円唇なので唇が前（左・lipX=40）に突き出つつ狭まる。
+            'open_o': {
+                pointX: 260, pointY: 160, bodyCx: 210, bodyCy: 176, angle: -15,
+                lipX: 42, upperLipY: 92, lowerLipY: 128
+            },
+            // [o]: 中高母音・後舌。舌の盛り上がりがさらに右上へ。より強い円唇。
+            'o': {
+                pointX: 270, pointY: 125, bodyCx: 215, bodyCy: 141, angle: -20,
+                lipX: 38, upperLipY: 94, lowerLipY: 126
+            },
+            // [u]: 高母音・後舌。舌の最高点が右上の奥深く（軟口蓋側）に極限まで引き上がる（右上がり傾斜）。唇は最も狭く前に突き出る。
+            'u': {
+                pointX: 280, pointY: 100, bodyCx: 220, bodyCy: 116, angle: -25,
+                lipX: 35, upperLipY: 96, lowerLipY: 124
+            },
+            // 初期状態（リセット）
+            'reset': {
+                pointX: 220, pointY: 190, bodyCx: 220, bodyCy: 190, angle: 0,
+                lipX: 50, upperLipY: 85, lowerLipY: 135
+            }
+        };
+
+        function clearTimeline() {
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+        }
+
+        function simulate(vowel) {
+            clearTimeline();
+
+            // 1. 【0秒】移動開始（振動なし）
+            applyPosition(vowel, false);
+
+            if (vowel === 'reset') return;
+
+            // 2. 【1.5秒】移動が終わった0.5秒後から、声帯の有声振動がスタート
+            const startVibrationTimeout = setTimeout(() => {
+                applyPosition(vowel, true);
+            }, 1500);
+
+            // 3. 【5秒】調音タイムライン終了。中央（リセット）へ自動帰還開始
+            const stopAndResetTimeout = setTimeout(() => {
+                applyPosition('reset', false);
+            }, 5000);
+
+            activeTimeouts.push(startVibrationTimeout, stopAndResetTimeout);
+        }
+
+        function applyPosition(vowelKey, enableVibration) {
+            const upperLip = document.getElementById('upper-lip');
+            const lowerLip = document.getElementById('lower-lip');
+            const tongueBodyContainer = document.getElementById('tongue-body-container');
+            const tongueBody = document.querySelector('[tongue-body]');
+            const tonguePointContainer = document.getElementById('tongue-point-container');
+            const tonguePoint = document.querySelector('[tongue-point]');
+            const vocalCordsContainer = document.getElementById('vocal-cords-container');
+
+            const data = positions[vowelKey];
+
+            // 舌先・舌本体の座標と傾きの連動
+            tonguePoint.setAttribute('cx', data.pointX);
+            tonguePoint.setAttribute('cy', data.pointY);
+            tongueBody.setAttribute('cx', data.bodyCx);
+            tongueBody.setAttribute('cy', data.bodyCy);
+            
+            tongueBodyContainer.style.transform = `rotate(${data.angle}deg)`;
+            tongueBodyContainer.style.transformOrigin = `${data.bodyCx}px ${data.bodyCy}px`;
+
+            // 唇の連動（円唇の突き出し X と、開き具合 Y を同時制御）
+            upperLip.setAttribute('x', data.lipX);
+            upperLip.setAttribute('y', data.upperLipY);
+            lowerLip.setAttribute('x', data.lipX);
+            lowerLip.setAttribute('y', data.lowerLipY);
+
+            // 全ての母音は有声音。指定タイムラインでのみ声帯を震わせる
+            if (enableVibration && vowelKey !== 'reset') {
+                vocalCordsContainer.classList.add('vibrating-subtle');
+            } else {
+                vocalCordsContainer.classList.remove('vibrating-subtle');
+            }
+        }
+    </script>
+</body>
+</html>
